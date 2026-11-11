@@ -322,7 +322,9 @@ const documentsMain = {
 								PostMessages.sendWOPIPostMessage('loolframe', 'Hide_Menu_Item', { id: 'insertgraphicremote' })
 							}
 
-							if (Config.get('userId') !== null && !Config.get('isPublicShare')) {
+							if (Config.get('userId') !== null
+								&& !Config.get('isPublicShare')
+								&& Config.get('allowOpenLocally') !== false) {
 								PostMessages.sendWOPIPostMessage('loolframe', 'Insert_Button', {
 									id: 'Open_Local_Editor',
 									imgurl: window.location.protocol + '//' + getNextcloudUrl() + imagePath('richdocuments', 'launch.svg'),

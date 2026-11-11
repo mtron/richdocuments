@@ -15,7 +15,9 @@ use OCA\Richdocuments\Db\Wopi;
 use OCA\Richdocuments\TemplateManager;
 use OCA\Theming\ImageManager;
 use OCP\AppFramework\Services\IInitialState;
+use OCP\Files\IRootFolder;
 use OCP\IConfig;
+use Psr\Log\LoggerInterface;
 
 class InitialStateService {
 	private bool $hasProvidedCapabilities = false;
@@ -29,6 +31,9 @@ class InitialStateService {
 		private CapabilitiesService $capabilitiesService,
 		private IConfig $config,
 		private LanguageService $languageService,
+		private OpenLocalPolicyService $openLocalPolicyService,
+		private IRootFolder $rootFolder,
+		private LoggerInterface $logger,
 		private ?string $userId,
 	) {
 	}
@@ -88,8 +93,11 @@ class InitialStateService {
 			throw new \InvalidArgumentException('token is required for authentication');
 		}
 
-		// merge provided parameters with default parameters
-		$this->initialState->provideInitialState('document', $this->prepareParams($params));
+		$params = $this->prepareParams($params);
+		// Always resolve server-side so Secure View cannot be bypassed by client params.
+		$params['allowOpenLocally'] = $this->resolveAllowOpenLocally($wopi);
+
+		$this->initialState->provideInitialState('document', $params);
 
 		$this->initialState->provideInitialState('wopi', $wopi);
 		// Options may have been set already, but ensure anyway.
@@ -135,14 +143,32 @@ class InitialStateService {
 			'title' => '',
 			'permissions' => '',
 			'isPublicShare' => false,
+			'allowOpenLocally' => true,
 		];
 
 		return array_merge($defaults, $params);
 	}
 
 	/**
-	 * Frontend options.
+	 * Whether Collabora may show "Open in local editor" for this WOPI session.
 	 */
+	public function resolveAllowOpenLocally(Wopi $wopi): bool {
+		try {
+			$nodes = $this->rootFolder->getById($wopi->getFileid());
+			$file = $nodes[0] ?? null;
+			if ($file === null) {
+				return false;
+			}
+			return $this->openLocalPolicyService->isAllowedForWopi($wopi, $file, null);
+		} catch (\Throwable $e) {
+			$this->logger->warning('Failed to resolve allowOpenLocally; denying local open', [
+				'exception' => $e,
+				'fileId' => $wopi->getFileid(),
+			]);
+			return false;
+		}
+	}
+
 	private function provideOptions(): void {
 		if ($this->hasProvidedOptions) {
 			return;

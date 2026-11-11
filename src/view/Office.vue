@@ -237,6 +237,9 @@ export default {
 			// Store original favicon for restoration
 			originalFavicon: null,
 
+			// From /token response: false for Secure View / hide-download
+			allowOpenLocally: true,
+
 			formData: {
 				action: null,
 				accessToken: null,
@@ -299,6 +302,7 @@ export default {
 				&& !this.isEmbedded
 				&& !!getLoggedInUser()
 				&& !this.isPublic
+				&& this.allowOpenLocally !== false
 		},
 
 		shareToken() {
@@ -423,6 +427,8 @@ export default {
 			}
 
 			Config.update('urlsrc', data.urlSrc)
+			this.allowOpenLocally = data.allowOpenLocally !== false
+			Config.update('allowOpenLocally', this.allowOpenLocally)
 			try {
 				this.postMessage.setAllowedOrigins([new URL(data.urlSrc).origin, window.location.origin])
 				this.postMessage.setTargetOrigins({ FRAME_DOCUMENT: new URL(data.urlSrc).origin })

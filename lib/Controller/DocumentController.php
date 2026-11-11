@@ -13,6 +13,7 @@ use OCA\Richdocuments\AppConfig;
 use OCA\Richdocuments\Db\Wopi;
 use OCA\Richdocuments\Service\FederationService;
 use OCA\Richdocuments\Service\InitialStateService;
+use OCA\Richdocuments\Service\OpenLocalPolicyService;
 use OCA\Richdocuments\TemplateManager;
 use OCA\Richdocuments\TokenManager;
 use OCP\AppFramework\Controller;
@@ -62,6 +63,7 @@ class DocumentController extends Controller {
 		private FederationService $federationService,
 		private InitialStateService $initialState,
 		private IURLGenerator $urlGenerator,
+		private OpenLocalPolicyService $openLocalPolicyService,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -403,7 +405,9 @@ class DocumentController extends Controller {
 			$this->tokenManager->setGuestName($wopi, $guestName);
 
 			$params = [
-				'urlSrc' => $this->tokenManager->getUrlSrc($file)
+				'urlSrc' => $this->tokenManager->getUrlSrc($file),
+				// Disable Collabora "Open locally" for Secure View / hide-download files
+				'allowOpenLocally' => $this->openLocalPolicyService->isAllowedForWopi($wopi, $file, $share),
 			];
 
 			$targetData = $this->session->get(self::SESSION_FILE_TARGET);

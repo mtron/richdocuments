@@ -94,10 +94,12 @@ export default {
 
 		openLocally() {
 			if (this.openingLocally) {
-				axios.post(
+				// Unlock via richdocuments first so Secure View / hide-download get a 403
+				// before files mint an openlocaleditor token.
+				this.unlockFile().then(() => axios.post(
 					generateOcsUrl('apps/files/api/v1/openlocaleditor'),
 					{ path: this.filename },
-				).then((result) => {
+				)).then((result) => {
 					const url = 'nc://open/'
 						+ getCurrentUser()?.uid + '@' + getNextcloudUrl()
 						+ encodePath(this.filename)
@@ -111,6 +113,8 @@ export default {
 						this.close()
 					}, 1000)
 					window.open(url, '_self')
+				}).catch(() => {
+					this.openingLocally = false
 				})
 			}
 		},

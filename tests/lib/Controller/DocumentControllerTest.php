@@ -14,6 +14,7 @@ use OCA\Richdocuments\Controller\DocumentController;
 use OCA\Richdocuments\Db\Wopi;
 use OCA\Richdocuments\Service\FederationService;
 use OCA\Richdocuments\Service\InitialStateService;
+use OCA\Richdocuments\Service\OpenLocalPolicyService;
 use OCA\Richdocuments\TemplateManager;
 use OCA\Richdocuments\TokenManager;
 use OCP\AppFramework\Http;
@@ -42,6 +43,7 @@ class DocumentControllerTest extends TestCase {
 	private ISession $session;
 	private IShareManager $shareManager;
 	private InitialStateService $initialStateService;
+	private OpenLocalPolicyService $openLocalPolicyService;
 
 	public function setUp(): void {
 		parent::setUp();
@@ -53,6 +55,8 @@ class DocumentControllerTest extends TestCase {
 		$this->session = $this->createMock(ISession::class);
 		$this->shareManager = $this->createMock(IShareManager::class);
 		$this->initialStateService = $this->createMock(InitialStateService::class);
+		$this->openLocalPolicyService = $this->createMock(OpenLocalPolicyService::class);
+		$this->openLocalPolicyService->method('isAllowedForWopi')->willReturn(true);
 
 		$this->controller = new DocumentController(
 			'richdocuments',
@@ -69,6 +73,7 @@ class DocumentControllerTest extends TestCase {
 			$this->federationService,
 			$this->initialStateService,
 			$this->createMock(IURLGenerator::class),
+			$this->openLocalPolicyService,
 		);
 	}
 
@@ -118,6 +123,40 @@ class DocumentControllerTest extends TestCase {
 		$data = $response->getData();
 		$this->assertSame('wopi-token-abc123', $data['token']);
 		$this->assertSame($expiry, $data['token_ttl']);
+		$this->assertTrue($data['allowOpenLocally']);
+	}
+
+	/**
+	 * Secure View / hide-download must tell the viewer not to insert "Open locally".
+	 *
+	 * @test
+	 */
+	public function tokenResponseDisallowsOpenLocallyWhenPolicyDenies(): void {
+		$this->openLocalPolicyService = $this->createMock(OpenLocalPolicyService::class);
+		$this->openLocalPolicyService->method('isAllowedForWopi')->willReturn(false);
+		$this->controller = new DocumentController(
+			'richdocuments',
+			$this->createMock(IRequest::class),
+			$this->createMock(IConfig::class),
+			$this->createMock(AppConfig::class),
+			$this->shareManager,
+			$this->tokenManager,
+			$this->rootFolder,
+			$this->session,
+			self::USER_ID,
+			$this->createMock(LoggerInterface::class),
+			$this->templateManager,
+			$this->federationService,
+			$this->initialStateService,
+			$this->createMock(IURLGenerator::class),
+			$this->openLocalPolicyService,
+		);
+
+		$this->expectTokenFor($this->makeWopi('wopi-token-abc123', 1700000000));
+
+		$response = $this->controller->token(self::FILE_ID);
+		$data = $response->getData();
+		$this->assertFalse($data['allowOpenLocally']);
 	}
 
 	/**

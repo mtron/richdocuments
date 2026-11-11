@@ -12,6 +12,7 @@ namespace OCA\Richdocuments\Controller;
 use Exception;
 use OCA\Richdocuments\AppInfo\Application;
 use OCA\Richdocuments\Helper;
+use OCA\Richdocuments\Service\OpenLocalPolicyService;
 use OCA\Richdocuments\TemplateManager;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\AnonRateLimit;
@@ -44,6 +45,7 @@ class DocumentAPIController extends \OCP\AppFramework\OCSController {
 		private LoggerInterface $logger,
 		private ILockManager $lockManager,
 		private ISession $session,
+		private OpenLocalPolicyService $openLocalPolicyService,
 		private ?string $userId,
 	) {
 		parent::__construct(Application::APPNAME, $request);
@@ -163,6 +165,11 @@ class DocumentAPIController extends \OCP\AppFramework\OCSController {
 			$file = $this->rootFolder->getUserFolder($this->userId)->getFirstNodeById($fileId);
 			if ($file === null) {
 				return new DataResponse([], Http::STATUS_NOT_FOUND);
+			}
+
+			// Block local open for Secure View (e.g. tag Personalplanung) / restricted files
+			if (!$this->openLocalPolicyService->isAllowedForFile($file, $this->userId, null)) {
+				return new DataResponse(['message' => 'Opening locally is disabled for this file'], Http::STATUS_FORBIDDEN);
 			}
 
 			$this->lockManager->unlock(new LockContext(
